@@ -30,6 +30,14 @@
   cargo run -- trc20
   ```
 
+- **TRX 原生转账（构建 → 签名 → 广播 → 监听）**
+
+  ```bash
+  export TRON_PRIVATE_KEY=<64位十六进制私钥>
+  # 可选：TRON_FROM_ADDRESS、TRON_TO_ADDRESS、TRX_AMOUNT_SUN（默认 1000 sun）
+  cargo run -- trx-transfer
+  ```
+
 - **监听交易确认状态**
 
   先设置要监听的交易哈希：

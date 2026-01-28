@@ -100,6 +100,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "reqwest",
+ "secp256k1",
  "serde",
  "serde_json",
  "thiserror",
@@ -114,8 +115,6 @@ name = "chains-test"
 version = "0.1.0"
 dependencies = [
  "chains-sdk",
- "hex",
- "secp256k1",
  "serde_json",
  "tokio",
 ]
