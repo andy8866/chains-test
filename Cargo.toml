@@ -1,0 +1,16 @@
+[package]
+name = "chains-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# 本地路径依赖到 chains SDK 项目
+chains-sdk = { path = "../chains" }
+
+# 用于异步 main 函数
+tokio = { version = "1.0", features = ["full"] }
+
+# Tron 本地签名（方案 B 全自动流程）
+secp256k1 = { version = "0.28", features = ["recovery"] }
+hex = "0.4"
+serde_json = "1.0"
