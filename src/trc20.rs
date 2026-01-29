@@ -1,15 +1,18 @@
 //! TRC20 代币测试与示例（只读查询、构建交易、全自动流程）
 
+use crate::config;
 use chains_sdk::chain::tron::{sign_tron_transaction, TronChain};
-use chains_sdk::rpc::chains::tron::{TronNetwork, TronRpcProvider};
+use chains_sdk::rpc::chains::tron::TronRpcProvider;
 use chains_sdk::transaction::{TransactionMonitor, TransactionSender, TransactionStatus};
 use std::env;
 use std::sync::Arc;
 
-/// 示例地址（Tron Nile 测试网）
-const ADDR: &str = "TG2D8vTp4xHBB2vhVbgHK2AhA2p9wY4q9M";
+/// 对外暴露：当前 Tron 网络（供 main 等使用）
+pub fn current_tron_network() -> chains_sdk::rpc::chains::tron::TronNetwork {
+    config::current_tron_network()
+}
 
-/// 查询 TRC20 USDT 余额（主网）
+/// 查询 TRC20 USDT 余额（网络由 TRON_NETWORK 指定，默认 nile）
 ///
 /// 环境变量：TRON_ADDRESS（必填）— 要查询的 Tron 地址
 pub async fn run_usdt_balance() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,11 +25,12 @@ pub async fn run_usdt_balance() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let chain = TronChain::mainnet();
-    let provider = TronRpcProvider::from_network(TronNetwork::Mainnet);
-    let usdt_contract = TronNetwork::Mainnet.usdt_contract();
+    let network = config::current_tron_network();
+    let chain = TronChain::from_network(network);
+    let provider = TronRpcProvider::from_network(network);
+    let usdt_contract = network.usdt_contract();
 
-    println!("=== TRC20 USDT 余额（主网）===");
+    println!("=== TRC20 USDT 余额（{}）===", network.name());
     println!("地址: {}", address);
     println!("合约: {}", usdt_contract);
 
@@ -46,14 +50,15 @@ pub async fn run_usdt_balance() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// 根据 SDK 验证 TRC20 API：只读接口 + 构建交易（使用 Nile 测试网与 SDK 内置 USDT 合约）
+/// 根据 SDK 验证 TRC20 API：只读接口 + 构建交易（网络由 TRON_NETWORK 指定）
 pub async fn run_verify_trc20() -> Result<(), Box<dyn std::error::Error>> {
-    let chain = TronChain::nile();
-    let provider = TronRpcProvider::from_network(TronNetwork::Nile);
-    let contract = TronNetwork::Nile.usdt_contract();
+    let network = config::current_tron_network();
+    let chain = TronChain::from_network(network);
+    let provider = TronRpcProvider::from_network(network);
+    let contract = network.usdt_contract();
 
-    println!("=== 根据 SDK 验证 TRC20 API（Nile 测试网）===");
-    println!("地址: {}", ADDR);
+    println!("=== 根据 SDK 验证 TRC20 API（{}）===", network.name());
+    println!("地址: {}", config::TRON_EXAMPLE_ADDR);
     println!("合约: {}", contract);
     println!();
 
@@ -61,7 +66,7 @@ pub async fn run_verify_trc20() -> Result<(), Box<dyn std::error::Error>> {
     let mut fail = 0;
 
     // trc20_balance_of
-    match chain.trc20_balance_of(&provider, ADDR, contract).await {
+    match chain.trc20_balance_of(&provider, config::TRON_EXAMPLE_ADDR, contract).await {
         Ok(b) => {
             println!("✅ trc20_balance_of  -> {}", b);
             ok += 1;
@@ -121,7 +126,7 @@ pub async fn run_verify_trc20() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // trc20_allowance(owner, spender, contract)
-    match chain.trc20_allowance(&provider, ADDR, ADDR, contract).await {
+    match chain.trc20_allowance(&provider, config::TRON_EXAMPLE_ADDR, config::TRON_EXAMPLE_ADDR, contract).await {
         Ok(a) => {
             println!("✅ trc20_allowance    -> {}", a);
             ok += 1;
@@ -133,7 +138,7 @@ pub async fn run_verify_trc20() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // trc20_token_info(owner, contract) -> Balance
-    match chain.trc20_token_info(&provider, ADDR, contract).await {
+    match chain.trc20_token_info(&provider, config::TRON_EXAMPLE_ADDR, contract).await {
         Ok(info) => {
             println!(
                 "✅ trc20_token_info   -> balance={} symbol={:?} decimals={:?}",
@@ -151,7 +156,7 @@ pub async fn run_verify_trc20() -> Result<(), Box<dyn std::error::Error>> {
 
     // trc20_build_transfer：校验返回 JSON 含 txID、raw_data
     match chain
-        .trc20_build_transfer(&provider, ADDR, ADDR, contract, "1000000", Some(100_000_000))
+        .trc20_build_transfer(&provider, config::TRON_EXAMPLE_ADDR, config::TRON_EXAMPLE_ADDR, contract, "1000000", Some(100_000_000))
         .await
     {
         Ok(tx_json) => {
@@ -178,7 +183,7 @@ pub async fn run_verify_trc20() -> Result<(), Box<dyn std::error::Error>> {
 
     // trc20_build_approve：仅校验返回为合法 JSON 且含 txID
     match chain
-        .trc20_build_approve(&provider, ADDR, ADDR, contract, "0", Some(100_000_000))
+        .trc20_build_approve(&provider, config::TRON_EXAMPLE_ADDR, config::TRON_EXAMPLE_ADDR, contract, "0", Some(100_000_000))
         .await
     {
         Ok(tx_json) => {
@@ -203,7 +208,7 @@ pub async fn run_verify_trc20() -> Result<(), Box<dyn std::error::Error>> {
 
     // trc20_build_transfer_from：仅校验返回为合法 JSON 且含 txID
     match chain
-        .trc20_build_transfer_from(&provider, ADDR, ADDR, contract, "0", Some(100_000_000))
+        .trc20_build_transfer_from(&provider, config::TRON_EXAMPLE_ADDR, config::TRON_EXAMPLE_ADDR, contract, "0", Some(100_000_000))
         .await
     {
         Ok(tx_json) => {
@@ -235,25 +240,25 @@ pub async fn run_verify_trc20() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// TRC20 查询与构建交易示例（不签名不广播，安全演示）
+/// TRC20 查询与构建交易示例（不签名不广播，安全演示；网络由 TRON_NETWORK 指定）
 pub async fn run_trc20_demo() -> Result<(), Box<dyn std::error::Error>> {
-    let chain = TronChain::nile();
-    let provider = TronRpcProvider::from_network(TronNetwork::Nile);
+    let network = config::current_tron_network();
+    let chain = TronChain::from_network(network);
+    let provider = TronRpcProvider::from_network(network);
 
-    println!("=== TRC20 代币功能示例 ===");
-    println!("地址: {}", ADDR);
+    println!("=== TRC20 代币功能示例（{}）===", network.name());
+    println!("地址: {}", config::TRON_EXAMPLE_ADDR);
 
-    // 优先环境变量，未设置则从 SDK 读取当前网络（Nile）的 USDT 合约地址
     let contract = env::var("TRC20_CONTRACT_ADDRESS")
-        .unwrap_or_else(|_| TronNetwork::Nile.usdt_contract().to_string());
+        .unwrap_or_else(|_| network.usdt_contract().to_string());
     if env::var("TRC20_CONTRACT_ADDRESS").is_err() {
-        println!("合约: {}（来自 SDK TronNetwork::Nile.usdt_contract()）", contract);
+        println!("合约: {}（来自 SDK {} 默认）", contract, network.name());
     } else {
         println!("合约: {}", contract);
     }
 
     // 余额
-    match chain.trc20_balance_of(&provider, ADDR, &contract).await {
+    match chain.trc20_balance_of(&provider, config::TRON_EXAMPLE_ADDR, &contract).await {
         Ok(balance) => println!("余额: {}", balance),
         Err(e) => println!("查询余额失败: {}", e),
     }
@@ -286,8 +291,8 @@ pub async fn run_trc20_demo() -> Result<(), Box<dyn std::error::Error>> {
     match chain
         .trc20_build_transfer(
             &provider,
-            ADDR,
-            ADDR,
+            config::TRON_EXAMPLE_ADDR,
+            config::TRON_EXAMPLE_ADDR,
             &contract,
             "1000000",
             Some(100_000_000),
@@ -320,17 +325,18 @@ pub async fn run_trx_transfer() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
-    let from_addr = env::var("TRON_FROM_ADDRESS").unwrap_or_else(|_| ADDR.to_string());
-    let to_addr = env::var("TRON_TO_ADDRESS").unwrap_or_else(|_| ADDR.to_string());
+    let from_addr = env::var("TRON_FROM_ADDRESS").unwrap_or_else(|_| config::TRON_EXAMPLE_ADDR.to_string());
+    let to_addr = env::var("TRON_TO_ADDRESS").unwrap_or_else(|_| config::TRON_EXAMPLE_ADDR.to_string());
     let amount_sun: i64 = env::var("TRX_AMOUNT_SUN")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(1000);
 
-    let chain = TronChain::nile();
-    let provider = TronRpcProvider::from_network(TronNetwork::Nile);
+    let network = config::current_tron_network();
+    let chain = TronChain::from_network(network);
+    let provider = TronRpcProvider::from_network(network);
 
-    println!("=== TRX 转账流程（构建 → 签名 → 广播 → 监听）===");
+    println!("=== TRX 转账流程（{}，构建 → 签名 → 广播 → 监听）===", network.name());
     println!("发送方: {}", from_addr);
     println!("接收方: {}", to_addr);
     println!("金额: {} sun ({:.6} TRX)", amount_sun, amount_sun as f64 / 1_000_000.0);
@@ -397,25 +403,25 @@ pub async fn run_full_flow() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
-    // 优先环境变量，未设置则从 SDK 读取当前网络（Nile）的 USDT 合约地址
+    let network = config::current_tron_network();
     let contract = env::var("TRC20_CONTRACT_ADDRESS")
-        .unwrap_or_else(|_| TronNetwork::Nile.usdt_contract().to_string());
-    let from_addr = env::var("TRON_FROM_ADDRESS").unwrap_or_else(|_| ADDR.to_string());
-    let to_addr = env::var("TRON_TO_ADDRESS").unwrap_or_else(|_| ADDR.to_string());
+        .unwrap_or_else(|_| network.usdt_contract().to_string());
+    let from_addr = env::var("TRON_FROM_ADDRESS").unwrap_or_else(|_| config::TRON_EXAMPLE_ADDR.to_string());
+    let to_addr = env::var("TRON_TO_ADDRESS").unwrap_or_else(|_| config::TRON_EXAMPLE_ADDR.to_string());
     let amount = env::var("TRC20_AMOUNT").unwrap_or_else(|_| "1000000".to_string());
     let fee_limit: i64 = env::var("TRC20_FEE_LIMIT")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(100_000_000);
 
-    let chain = TronChain::nile();
-    let provider = TronRpcProvider::from_network(TronNetwork::Nile);
+    let chain = TronChain::from_network(network);
+    let provider = TronRpcProvider::from_network(network);
 
-    println!("=== 全自动 TRC20 流程（构建 → 签名 → 广播 → 监听）===");
+    println!("=== 全自动 TRC20 流程（{}，构建 → 签名 → 广播 → 监听）===", network.name());
     println!("发送方: {}", from_addr);
     println!("接收方: {}", to_addr);
     if env::var("TRC20_CONTRACT_ADDRESS").is_err() {
-        println!("合约: {}（来自 SDK TronNetwork::Nile.usdt_contract()）", contract);
+        println!("合约: {}（来自 SDK {} 默认）", contract, network.name());
     } else {
         println!("合约: {}", contract);
     }
