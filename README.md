@@ -1,108 +1,111 @@
 # chains-test
 
-一个用于**本地测试 `chains-sdk` 的示例 Rust 项目**。
+用于**本地测试 `chains-sdk` 的示例 Rust 项目**，覆盖 Tron（TRX/TRC20）与 EVM（ETH/ERC20）的只读查询、构建交易、签名广播与交易监听。
 
 ## 前置条件
 
-- 已在同级目录下克隆/存在 `chains-sdk` 项目：
+- 同级目录存在 `chains-sdk` 项目，且 `Cargo.toml` 中 `chains-sdk = { path = "../chains" }` 可解析
+- 已安装 Rust / Cargo（建议 `rustup`）
+- 网络可访问 Tron 与 EVM 公共 RPC（如 Nile、Sepolia、Arbitrum Sepolia）
 
-  - 当前项目路径：`/Users/f/Documents/my/code/chains-test`
-  - SDK 项目路径：`/Users/f/Documents/my/code/chains`
+## 代码结构
 
-- 已安装 Rust 与 Cargo（建议使用 `rustup` 安装）。
+```
+src/
+├── main.rs    # 入口、CLI 分发、TRX 余额、Tron 交易监听
+├── config.rs  # 环境与网络配置（TRON_NETWORK / EVM_NETWORK、RPC 选取）
+├── trc20.rs   # Tron：TRX/TRC20 查询、构建、签名广播、全流程
+└── erc20.rs   # EVM：原生 ETH / ERC20 查询、构建、签名广播、全流程
+```
 
-## 运行示例
+- **main.rs**：解析子命令，调用 `trc20` / `erc20` 模块；实现 `tron-balance`、`tron-monitor` 及 `help`
+- **config.rs**：从环境变量解析 `TRON_NETWORK` / `EVM_NETWORK`，提供示例地址与 EVM RPC 健康检查
+- **trc20.rs**：TRC20 只读、TRX 转账、TRC20 全流程、验证 TRC20 API
+- **erc20.rs**：原生 ETH 余额/转账/监听、ERC20 只读/全流程、验证 ERC20 API
 
-在 `chains-test` 目录下执行不同子命令：
+## 网络选择
 
-- **查询 TRX 余额**
+| 环境变量       | 说明 | 可选值 |
+|----------------|------|--------|
+| `TRON_NETWORK` | Tron 网络 | `nile`（默认）、`mainnet`、`shasta` |
+| `EVM_NETWORK`  | EVM 网络  | `sepolia`（默认）、`arbitrum-sepolia`、`arbitrum-one`、`mainnet` |
 
-  ```bash
-  cargo run -- balance
-  ```
+未设置 `EVM_RPC_URL` 时，程序从 SDK 提供的该网络备选 RPC 中依次健康检查选取可用节点。
 
-- **TRC20 代币信息与构建转账交易（不签名不广播）**
+## 命令一览
 
-  先设置代币合约地址环境变量：
+### Tron（网络由 TRON_NETWORK 指定）
 
-  ```bash
-  export TRC20_CONTRACT_ADDRESS=<TRC20合约地址>
-  cargo run -- trc20
-  ```
+| 命令 | 说明 |
+|------|------|
+| `tron-balance` | 查询 TRX 余额 |
+| `tron-trc20` | TRC20 代币信息 + 构建转账（不签名不广播） |
+| `tron-usdt-balance` | 查询 USDT 余额（按当前网络 USDT 合约） |
+| `tron-verify-trc20` | 按 SDK 验证全部 TRC20 API |
+| `tron-transfer` | TRX 原生转账：构建→签名→广播→监听 |
+| `tron-full-flow` | 全自动 TRC20：构建→签名→广播→监听 |
+| `tron-monitor` | 按交易哈希监听 Tron 交易（需 `TX_HASH`） |
 
-- **TRX 原生转账（构建 → 签名 → 广播 → 监听）**
+### EVM 原生 ETH（网络由 EVM_NETWORK 指定）
 
-  ```bash
-  export TRON_PRIVATE_KEY=<64位十六进制私钥>
-  # 可选：TRON_FROM_ADDRESS、TRON_TO_ADDRESS、TRX_AMOUNT_SUN（默认 1000 sun）
-  cargo run -- trx-transfer
-  ```
+| 命令 | 说明 |
+|------|------|
+| `eth-balance` | 查询原生 ETH 余额 |
+| `eth-transfer` | 原生 ETH 转账全流程：构建→签名→广播→监听 |
+| `eth-monitor` | 按交易哈希监听交易（需 `TX_HASH`） |
 
-- **监听交易确认状态**
+### ERC20（网络由 EVM_NETWORK 指定）
 
-  先设置要监听的交易哈希：
+| 命令 | 说明 |
+|------|------|
+| `erc20-demo` | ERC20 代币信息 + 构建转账（不签名不广播） |
+| `erc20-verify` | 按 SDK 验证全部 ERC20 API |
+| `erc20-full-flow` | 全自动 ERC20：构建→签名→广播→监听 |
 
-  ```bash
-  export TX_HASH=<交易哈希>
-  cargo run -- monitor
-  ```
+### 其他
 
-- **发送交易并等待确认（示例用假交易数据）**
+| 命令 | 说明 |
+|------|------|
+| `help` / `-h` / `--help` | 显示命令列表与用法 |
 
-  ```bash
-  cargo run -- send-demo
-  ```
+查看所有命令：`cargo run -- help`
 
-  > 注意：`send-demo` 示例中使用的是 SDK 示例里的假 `raw_tx` JSON，仅用于演示接口调用流程。  
-  > 真正上链前，请务必替换为你自己“构建并签名”的原始交易数据。
+## 快速示例
 
-- **真实上链：发送你已签名的原始交易 JSON**
+```bash
+# TRX 余额（Nile）
+cargo run -- tron-balance
 
-  方式一：直接用环境变量传 JSON（适合短交易）：
+# TRC20 代币信息（可设置 TRC20_CONTRACT_ADDRESS）
+export TRC20_CONTRACT_ADDRESS=TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
+cargo run -- tron-trc20
 
-  ```bash
-  export SIGNED_TX_JSON='{"raw_data":{...},"signature":[...]}'
-  cargo run -- send-signed
-  ```
+# TRX 原生转账（需私钥）
+export TRON_PRIVATE_KEY=<64位十六进制私钥>
+export TRON_TO_ADDRESS=TPsXm9mBMn8WGoDQcvroGPQbb3WpP7K15t
+cargo run -- tron-transfer
 
-  方式二：从文件读取（推荐，便于调试和保存）：
+# 全自动 TRC20（需私钥 + 合约）
+export TRON_PRIVATE_KEY=<64位十六进制私钥>
+export TRC20_CONTRACT_ADDRESS=<Nile 上的 TRC20 合约>
+cargo run -- tron-full-flow
 
-  ```bash
-  echo '{"raw_data":{...},"signature":[...]}' > signed_tx.json
-  export SIGNED_TX_PATH=$(pwd)/signed_tx.json
-  cargo run -- send-signed
-  ```
+# 监听 Tron 交易
+export TX_HASH=<交易哈希>
+cargo run -- tron-monitor
 
-  chains-sdk 会：
+# 原生 ETH 余额（Sepolia）
+cargo run -- eth-balance
 
-  - 使用 Tron Nile 测试网的 RPC 发送该已签名交易
-  - 打印交易哈希
-  - 轮询等待确认结果（成功 / 失败 / 超时）
+# 全自动 ERC20（需私钥）
+export ETH_PRIVATE_KEY=<64位十六进制私钥>
+export ERC20_AMOUNT=120
+cargo run -- erc20-full-flow
+```
 
-- **方案 B：全自动流程（构建 → 私钥签名 → 广播 → 监听）**
+**安全提示：** 私钥仅用于本地签名，不会上传；建议仅在测试网使用，勿泄露私钥。
 
-  一条命令完成 TRC20 转账：在本项目内用环境变量传入私钥与合约等，自动完成构建、签名、广播、监听。
+## 文档
 
-  **必填环境变量：**
-
-  - `TRON_PRIVATE_KEY`：发送方**私钥的十六进制**（32 字节 = 64 个 `0-9`/`a-f` 字符，可带 `0x` 前缀）。**不能填助记词**；若只有助记词，请先用 TronLink 或 `tronweb` 等从助记词导出私钥 hex 再填入。
-  - `TRC20_CONTRACT_ADDRESS`：TRC20 合约地址（**必须是当前网络上的合约**：`full-flow` 使用 Nile 测试网，请使用在 Nile 上已部署的 TRC20 合约地址，不要填主网合约如 USDC，否则会报 `triggerSmartContract missing transaction`）
-
-  **可选环境变量：**
-
-  - `TRON_FROM_ADDRESS`：发送方地址（默认示例地址）
-  - `TRON_TO_ADDRESS`：接收方地址（默认同 FROM）
-  - `TRC20_AMOUNT`：转账金额，最小单位（默认 `1000000`）
-  - `TRC20_FEE_LIMIT`：费用上限 sun（默认 `100000000`）
-
-  **示例（Nile 测试网，请将合约改为你在 Nile 上部署或已有的 TRC20 合约）：**
-
-  ```bash
-  export TRON_PRIVATE_KEY=79a5d62ebbe36b4e54fa5d795de9a2d4c528508a48e004cafbe0660a8d286e08
-  export TRC20_CONTRACT_ADDRESS=TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
-  export TRON_FROM_ADDRESS=TG2D8vTp4xHBB2vhVbgHK2AhA2p9wY4q9M
-  export TRON_TO_ADDRESS=TPsXm9mBMn8WGoDQcvroGPQbb3WpP7K15t
-  cargo run -- full-flow
-  ```
-
-  **安全提示：** 私钥仅用于本地签名，不会上传；建议仅在测试网（如 Nile）使用，勿在生产环境泄露私钥。
+- **[docs/测试说明.md](docs/测试说明.md)** — 各命令的环境变量、预期结果与推荐测试顺序
+- **[docs/功能与代码结构.md](docs/功能与代码结构.md)** — SDK 依赖、模块职责与功能说明
